@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Binary Classification Test Explorer</title>
+<meta name="author" content="Timothy G. McNaughton MD PhD" />
+<meta name="copyright" content="© 2026 Timothy G. McNaughton MD PhD" />
+<link rel="license" href="https://creativecommons.org/licenses/by-nc-nd/4.0/" />
+<style>
+  :root { --bg:#f5f7fb; --panel:#fff; --ink:#172033; --muted:#5d687b; --line:#263247; --tp:#900c3e; --fn:#c70039; --fp:#63cdf3; --tn:#2462a9; --accent:#1664d8; --green:#198754; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:22px clamp(16px,4vw,52px) 12px; }
+  h1 { margin:0 0 6px; font-size:clamp(25px,3.2vw,42px); }
+  .subtitle { color:var(--muted); max-width:920px; line-height:1.45; }
+  main { padding:0 clamp(12px,3vw,42px) 40px; max-width:1600px; margin:auto; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:12px 18px; align-items:end; background:var(--panel); padding:14px; border:1px solid #dfe5ef; border-radius:14px; box-shadow:0 5px 20px #1720330d; }
+  label { font-size:13px; font-weight:650; color:var(--muted); display:grid; gap:5px; }
+  input[type=number] { width:110px; padding:9px 10px; border:1px solid #bcc7d7; border-radius:9px; font:inherit; color:var(--ink); background:white; }
+  button { border:1px solid #b7c4d6; background:white; color:var(--ink); border-radius:9px; padding:9px 12px; font:600 14px/1.1 inherit; cursor:pointer; }
+  button:hover { border-color:#6680a5; }
+  button.active { background:#e9f1ff; border-color:#6ca0f1; color:#0c4ba3; }
+  .layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:18px; margin-top:18px; align-items:start; }
+  .card { background:var(--panel); border:1px solid #dfe5ef; border-radius:14px; box-shadow:0 5px 20px #1720330d; }
+  .canvas-card { padding:10px; }
+  canvas { display:block; width:100%; height:auto; border-radius:9px; touch-action:none; }
+  .side { padding:16px; }
+  .side h2 { margin:0 0 12px; font-size:18px; }
+  .metric { display:flex; justify-content:space-between; gap:16px; padding:8px 0; border-bottom:1px solid #edf0f5; }
+  .metric strong { font-variant-numeric:tabular-nums; }
+  .controls { display:grid; gap:14px; margin-top:15px; }
+  .range-row { display:grid; grid-template-columns:92px 1fr 58px; align-items:center; gap:8px; font-size:13px; }
+  input[type=range] { width:100%; }
+  .swatch { display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:6px; }
+  .legend { display:grid; grid-template-columns:1fr 1fr; gap:7px; font-size:13px; margin-top:14px; }
+  .hint { margin:10px 3px 2px; color:var(--muted); font-size:13px; line-height:1.45; }
+  .scenarios { margin-top:18px; padding:16px; }
+  .scenario-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+  details { margin-top:18px; padding:16px; }
+  summary { cursor:pointer; font-weight:750; font-size:18px; }
+  .tutorial { max-width:900px; line-height:1.58; color:#2e384b; }
+  .tutorial h3 { margin-top:24px; }
+  .note { background:#f2f7ff; border-left:4px solid #6a9deb; padding:10px 12px; border-radius:6px; }
+  .license { margin-top:18px; padding:16px; color:var(--muted); font-size:13px; line-height:1.55; }
+  .license strong { color:var(--ink); }
+  .license a { color:var(--accent); }
+  .license p { margin:4px 0; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  @media(max-width:900px){ .layout{grid-template-columns:1fr}.side{order:-1}.range-row{grid-template-columns:85px 1fr 55px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Binary Classification Test Explorer</h1>
+  <div class="subtitle">Explore how disease prevalence, sensitivity, and specificity determine true positives, false positives, false negatives, true negatives, predictive values, and likelihood ratios.</div>
+</header>
+<main>
+  <section class="toolbar" aria-label="App controls">
+    <label>Patients (N)<input id="nInput" type="number" min="1" max="10000000" step="1" value="1000"></label>
+    <button id="pvBtn" class="active" type="button">Predictive values</button>
+    <button id="lrBtn" type="button">Likelihood ratios</button>
+    <button id="resetBtn" type="button">Reset</button>
+  </section>
+
+  <div class="layout">
+    <section class="card canvas-card">
+      <canvas id="chart" width="1200" height="720" aria-label="Interactive two by two classification diagram"></canvas>
+      <p class="hint">Drag the <b>horizontal boundary</b> within the left column to change sensitivity, within the right column to change specificity, or use the large <b>◀ ▶ prevalence handle</b> below the graph (the vertical divider still works too). The sliders also work on phones and tablets.</p>
+    </section>
+
+    <aside class="card side">
+      <h2>Test parameters</h2>
+      <div class="controls">
+        <div class="range-row"><span>Sensitivity</span><input id="sens" type="range" min="0" max="1" step="0.001" value="0.95"><output id="sensOut">95.0%</output></div>
+        <div class="range-row"><span>Specificity</span><input id="spec" type="range" min="0" max="1" step="0.001" value="0.85"><output id="specOut">85.0%</output></div>
+        <div class="range-row"><span>Prevalence</span><input id="prev" type="range" min="0.001" max="0.999" step="0.001" value="0.33"><output id="prevOut">33.0%</output></div>
+      </div>
+
+      <h2 style="margin-top:22px">Results</h2>
+      <div class="metric"><span>Positive predictive value</span><strong id="ppv">—</strong></div>
+      <div class="metric"><span>Negative predictive value</span><strong id="npv">—</strong></div>
+      <div class="metric"><span>Positive likelihood ratio</span><strong id="lrp">—</strong></div>
+      <div class="metric"><span>Negative likelihood ratio</span><strong id="lrn">—</strong></div>
+      <div class="metric"><span>Positive tests</span><strong id="positive">—</strong></div>
+      <div class="metric"><span>Negative tests</span><strong id="negative">—</strong></div>
+
+      <div class="legend" aria-label="Outcome legend">
+        <div><span class="swatch" style="background:var(--tp)"></span>True positive</div>
+        <div><span class="swatch" style="background:var(--fp)"></span>False positive</div>
+        <div><span class="swatch" style="background:var(--fn)"></span>False negative</div>
+        <div><span class="swatch" style="background:var(--tn)"></span>True negative</div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card scenarios">
+    <h2 style="margin-top:0">Teaching examples</h2>
+    <div class="scenario-buttons">
+      <button data-sens="0.99" data-spec="0.95" data-prev="0.05">99% sens / 95% spec / 5% prev</button>
+      <button data-sens="0.99" data-spec="0.99" data-prev="0.01">99% / 99% / 1%</button>
+      <button data-sens="0.99" data-spec="0.90" data-prev="0.01">99% / 90% / 1%</button>
+      <button data-sens="0.80" data-spec="0.995" data-prev="0.03">80% / 99.5% / 3%</button>
+      <button data-sens="1" data-spec="1" data-prev="0.20">Perfect test</button>
+    </div>
+  </section>
+
+  <details class="card">
+    <summary>Tutorial: how to interpret the diagram</summary>
+    <div class="tutorial">
+      <p><b>Binary classification</b> means that a test returns one of two qualitative results: yes/no, positive/negative, or present/absent.</p>
+      <p>For a perfectly accurate diagnostic test, everyone with disease tests positive (100% sensitivity) and everyone without disease tests negative (100% specificity). Real-world tests make two kinds of errors: a <b>false positive</b> is a false alarm, while a <b>false negative</b> is a missed alarm.</p>
+      <p>The diagram represents a 2×2 contingency table. The <b>left</b> side contains patients with disease and the <b>right</b> side healthy patients. The <b>top</b> represents positive tests and the <b>bottom</b> negative tests. Each colored rectangle's area is proportional to the number of patients in that group.</p>
+      <h3>Predictive values</h3>
+      <p><b>PPV</b> answers: “Given that this patient's test is positive, how likely is it that the patient actually has the disease?” <b>NPV</b> answers the corresponding question after a negative result.</p>
+      <p class="note">Try lowering prevalence while keeping sensitivity and specificity high. The false-positive rectangle can become a large fraction of all positive tests even though the test itself is highly accurate.</p>
+      <h3>Screening and confirmatory testing</h3>
+      <p>Screening is difficult in low-prevalence populations. A highly sensitive first test can identify most people with disease, but may also produce many false positives. A more specific confirmatory test can then be applied to the test-positive group. Clinical history and physical examination likewise change the pre-test probability before a formal diagnostic test is interpreted.</p>
+      <h3>Using the App to Extend Reported Diagnostic Statistics</h3>
+      <p>Diagnostic studies frequently report selected measures of test performance, such as sensitivity, specificity, and disease prevalence, while omitting clinically important derived measures such as positive predictive value (PPV) and negative predictive value (NPV). This application can be used to extend the reported data by entering the available test characteristics and calculating the corresponding predictive values and expected frequencies of true-positive, false-positive, true-negative, and false-negative results. Displaying these outcomes for a defined hypothetical population also provides a direct visual representation of how test performance interacts with disease prevalence in the population being studied.</p>
+
+    </div>
+  </details>
+
+  <footer class="card license" aria-label="License and copyright">
+    <p><strong>© 2026 Timothy G. McNaughton MD PhD. Some rights reserved.</strong></p>
+    <p>This work, <cite>Binary Classification Test Explorer</cite>, is licensed under the
+      <a rel="license noopener" href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License (CC BY-NC-ND 4.0)</a>.
+    </p>
+    <p>You may copy and redistribute this work in any medium or format for <strong>non-commercial purposes</strong>, provided that appropriate attribution is given to <strong>Timothy G. McNaughton MD PhD</strong> and a link to the license is included. Adapted or modified versions may not be shared under this license.</p>
+    <p>For uses beyond the scope of this license, including commercial use or permission to distribute adaptations, please obtain separate permission from the copyright holder. Rights provided by applicable exceptions and limitations, such as fair use, are not restricted by this notice.</p>
+  </footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const state = { N:1000, sens:.95, spec:.85, prev:.33, mode:'pv', drag:null };
+  const colors = {tp:'#900c3e', tn:'#2462a9', fn:'#c70039', fp:'#63cdf3', ink:'#111827', grid:'#263247', pv:'#198754'};
+  const fmtPct = x => (100*x).toFixed(x < .01 ? 1 : 1) + '%';
+  const fmt3 = x => Number.isFinite(x) ? x.toFixed(3) : '∞';
+  const clamp = (x,a,b) => Math.min(b,Math.max(a,x));
+
+  function stats(){
+    const disease = state.N * state.prev;
+    const healthy = state.N - disease;
+    const TP = disease * state.sens;
+    const FN = disease - TP;
+    const TN = healthy * state.spec;
+    const FP = healthy - TN;
+    const PPV = TP + FP ? TP/(TP+FP) : NaN;
+    const NPV = TN + FN ? TN/(TN+FN) : NaN;
+    const LRP = state.spec === 1 ? Infinity : state.sens/(1-state.spec);
+    const LRN = state.spec === 0 ? Infinity : (1-state.sens)/state.spec;
+    return {TP,FN,TN,FP,PPV,NPV,LRP,LRN};
+  }
+
+  function geometry(){
+    const W=canvas.width,H=canvas.height;
+    const L=145,R=W-95,T=95,B=H-115,M=(T+B)/2;
+    const X=L+(R-L)*state.prev;
+    const ySens=M-(M-T)*state.sens;
+    const ySpec=M+(B-M)*state.spec;
+    const yFP=M-(M-T)*(1-state.spec);
+    const yFN=M+(B-M)*(1-state.sens);
+    return {W,H,L,R,T,B,M,X,ySens,ySpec,yFP,yFN};
+  }
+
+  function roundedLabel(text,x,y,fill='#ffffffdd',ink='#111827',font='700 21px system-ui'){
+    ctx.font=font; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const w=ctx.measureText(text).width+18,h=34;
+    ctx.fillStyle=fill; ctx.beginPath(); ctx.roundRect(x-w/2,y-h/2,w,h,8); ctx.fill();
+    ctx.fillStyle=ink; ctx.fillText(text,x,y+1);
+  }
+
+  function draw(){
+    const g=geometry(), s=stats();
+    ctx.clearRect(0,0,g.W,g.H); ctx.fillStyle='#fff'; ctx.fillRect(0,0,g.W,g.H);
+
+    // Rectangles: area faithfully encodes each cell of the 2x2 table.
+    ctx.fillStyle=colors.tp; ctx.fillRect(g.L,g.ySens,g.X-g.L,g.M-g.ySens);
+    ctx.fillStyle=colors.fn; ctx.fillRect(g.L,g.M,g.X-g.L,g.yFN-g.M);
+    ctx.fillStyle=colors.fp; ctx.fillRect(g.X,g.yFP,g.R-g.X,g.M-g.yFP);
+    ctx.fillStyle=colors.tn; ctx.fillRect(g.X,g.M,g.R-g.X,g.ySpec-g.M);
+
+    ctx.strokeStyle=colors.grid; ctx.lineWidth=2;
+    ctx.strokeRect(g.L,g.T,g.R-g.L,g.B-g.T);
+    ctx.beginPath(); ctx.moveTo(g.X,g.T);ctx.lineTo(g.X,g.B);ctx.moveTo(g.L,g.M);ctx.lineTo(g.R,g.M);ctx.stroke();
+
+    roundedLabel(`TP: ${Math.round(s.TP)}`,(g.L+g.X)/2,(g.ySens+g.M)/2,'#ffffffd9');
+    roundedLabel(`FN: ${Math.round(s.FN)}`,(g.L+g.X)/2,(g.M+g.yFN)/2,'#ffffffd9');
+    roundedLabel(`FP: ${Math.round(s.FP)}`,(g.X+g.R)/2,(g.yFP+g.M)/2,'#ffffffd9');
+    roundedLabel(`TN: ${Math.round(s.TN)}`,(g.X+g.R)/2,(g.M+g.ySpec)/2,'#ffffffd9');
+
+    ctx.fillStyle=colors.ink; ctx.font='700 22px system-ui'; ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    ctx.fillText(`Disease: ${Math.round(state.N*state.prev)}`,(g.L+g.X)/2,g.T-26);
+    ctx.fillText(`Healthy: ${Math.round(state.N*(1-state.prev))}`,(g.X+g.R)/2,g.T-26);
+    ctx.fillText(`Prevalence: ${fmtPct(state.prev)}`,g.X,g.B+42);
+
+    // Large prevalence handle below the plotting area.  This is intentionally
+    // outside the data rectangles so it is easy to acquire with a mouse or finger.
+    const handleY = g.B + 82, handleW = 86, handleH = 38;
+    ctx.fillStyle='#ffffff'; ctx.strokeStyle=colors.grid; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(g.X-handleW/2,handleY-handleH/2,handleW,handleH,12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=colors.ink; ctx.font='800 22px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('◀  ▶',g.X,handleY+1);
+    ctx.beginPath(); ctx.moveTo(g.X,g.B); ctx.lineTo(g.X,handleY-handleH/2); ctx.strokeStyle=colors.grid; ctx.lineWidth=2; ctx.stroke();
+
+    ctx.save();ctx.translate(40,(g.T+g.M)/2);ctx.rotate(-Math.PI/2);ctx.fillText(`Positive test: ${Math.round(s.TP+s.FP)}`,0,0);ctx.restore();
+    ctx.save();ctx.translate(40,(g.M+g.B)/2);ctx.rotate(-Math.PI/2);ctx.fillText(`Negative test: ${Math.round(s.FN+s.TN)}`,0,0);ctx.restore();
+
+    // Drag handles / parameter labels.
+    ctx.lineWidth=6; ctx.lineCap='round';
+    ctx.strokeStyle='#fff'; ctx.beginPath();ctx.moveTo(g.L+8,g.ySens);ctx.lineTo(g.X-8,g.ySens);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(g.X+8,g.ySpec);ctx.lineTo(g.R-8,g.ySpec);ctx.stroke();
+    roundedLabel(`Sensitivity ${fmtPct(state.sens)}`,g.L+85,g.ySens-25,'#ffffffeb');
+    roundedLabel(`Specificity ${fmtPct(state.spec)}`,g.R-85,g.ySpec+25,'#ffffffeb');
+
+    if(state.mode==='pv' && Number.isFinite(s.PPV) && Number.isFinite(s.NPV)){
+      ctx.strokeStyle=colors.pv;ctx.fillStyle=colors.pv;ctx.lineWidth=3;
+      const ppvX=g.L+s.PPV*(g.R-g.L), npvX=g.R-s.NPV*(g.R-g.L);
+      ctx.beginPath();ctx.moveTo(g.L,g.ySens);ctx.lineTo(g.R,g.yFP);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(g.R,g.ySpec);ctx.lineTo(g.L,g.yFN);ctx.stroke();
+      ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(ppvX,g.T);ctx.lineTo(ppvX,g.M);ctx.moveTo(npvX,g.M);ctx.lineTo(npvX,g.B);ctx.stroke();
+      roundedLabel(`PPV ${fmtPct(s.PPV)}`,ppvX,g.T+25,'#e9faef',colors.pv,'750 19px system-ui');
+      roundedLabel(`NPV ${fmtPct(s.NPV)}`,npvX,g.B-25,'#e9faef',colors.pv,'750 19px system-ui');
+    }
+    if(state.mode==='lr'){
+      const x=g.X;
+      ctx.strokeStyle='#6b7280';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,g.T);ctx.lineTo(x,g.B);ctx.stroke();
+      roundedLabel(`LR+ ${fmt3(s.LRP)}`,x,g.ySens-42,'#f4f4f5');
+      roundedLabel(`LR− ${fmt3(s.LRN)}`,x,g.yFN+42,'#f4f4f5');
+    }
+
+    $('sensOut').value=fmtPct(state.sens); $('specOut').value=fmtPct(state.spec); $('prevOut').value=fmtPct(state.prev);
+    $('ppv').textContent=Number.isFinite(s.PPV)?fmtPct(s.PPV):'—'; $('npv').textContent=Number.isFinite(s.NPV)?fmtPct(s.NPV):'—';
+    $('lrp').textContent=fmt3(s.LRP); $('lrn').textContent=fmt3(s.LRN);
+    $('positive').textContent=Math.round(s.TP+s.FP).toLocaleString(); $('negative').textContent=Math.round(s.FN+s.TN).toLocaleString();
+  }
+
+  function syncInputs(){ $('sens').value=state.sens; $('spec').value=state.spec; $('prev').value=state.prev; $('nInput').value=state.N; draw(); }
+  ['sens','spec','prev'].forEach(id => $(id).addEventListener('input',e=>{state[id]=+e.target.value;draw();}));
+  $('nInput').addEventListener('input',e=>{state.N=Math.max(1,Math.round(+e.target.value||1));draw();});
+  $('resetBtn').addEventListener('click',()=>{Object.assign(state,{N:1000,sens:.95,spec:.85,prev:.33,mode:'pv'});setModeButtons();syncInputs();});
+  function setModeButtons(){ $('pvBtn').classList.toggle('active',state.mode==='pv'); $('lrBtn').classList.toggle('active',state.mode==='lr'); draw(); }
+  $('pvBtn').onclick=()=>{state.mode='pv';setModeButtons();}; $('lrBtn').onclick=()=>{state.mode='lr';setModeButtons();};
+  document.querySelectorAll('[data-sens]').forEach(b=>b.onclick=()=>{state.sens=+b.dataset.sens;state.spec=+b.dataset.spec;state.prev=+b.dataset.prev;syncInputs();});
+
+  function point(ev){const r=canvas.getBoundingClientRect(); return {x:(ev.clientX-r.left)*canvas.width/r.width,y:(ev.clientY-r.top)*canvas.height/r.height};}
+  function prevalenceHandleHit(p,g){
+    const handleY=g.B+82, halfW=55, halfH=30;
+    return p.x>=g.X-halfW && p.x<=g.X+halfW && p.y>=handleY-halfH && p.y<=handleY+halfH;
+  }
+  canvas.addEventListener('pointerdown',ev=>{
+    const p=point(ev),g=geometry(),near=(a,b,t=28)=>Math.abs(a-b)<=t;
+    if(prevalenceHandleHit(p,g)) state.drag='prev';
+    else if(p.x>=g.L&&p.x<=g.X&&near(p.y,g.ySens,35)) state.drag='sens';
+    else if(p.x>=g.X&&p.x<=g.R&&near(p.y,g.ySpec,35)) state.drag='spec';
+    else if(p.y>=g.T&&p.y<=g.B&&near(p.x,g.X,35)) state.drag='prev';
+    else if(p.x<g.X&&p.x>g.L&&p.y<g.M) state.drag='sens';
+    else if(p.x>g.X&&p.x<g.R&&p.y>g.M) state.drag='spec';
+    if(state.drag){canvas.setPointerCapture(ev.pointerId);ev.preventDefault();}
+  });
+  canvas.addEventListener('pointermove',ev=>{
+    const p=point(ev),g=geometry();
+    if(!state.drag){
+      const near=(a,b,t=28)=>Math.abs(a-b)<=t;
+      canvas.style.cursor = prevalenceHandleHit(p,g) || (p.y>=g.T&&p.y<=g.B&&near(p.x,g.X,25)) ? 'ew-resize' :
+        ((p.x>=g.L&&p.x<=g.X&&near(p.y,g.ySens,28)) || (p.x>=g.X&&p.x<=g.R&&near(p.y,g.ySpec,28)) ? 'ns-resize' : 'default');
+      return;
+    }
+    if(state.drag==='sens') state.sens=clamp((g.M-p.y)/(g.M-g.T),0,1);
+    if(state.drag==='spec') state.spec=clamp((p.y-g.M)/(g.B-g.M),0,1);
+    if(state.drag==='prev') state.prev=clamp((p.x-g.L)/(g.R-g.L),.001,.999);
+    syncInputs(); ev.preventDefault();
+  });
+  ['pointerup','pointercancel'].forEach(type=>canvas.addEventListener(type,()=>state.drag=null));
+
+  syncInputs();
+})();
+</script>
+</body>
+</html>
